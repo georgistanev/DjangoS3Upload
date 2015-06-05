@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+    <img id='preview' src='' style="max-height: 300px;" >
+    <span id='avatar_url'></span>
+    <br />
+
+
+    <input type="file" id="file_input" fileread />
+    <br />
+    <button class="btn btn-default" onclick="init_upload()">
+          Upload to Amazon s3
+    </button>
+
+    <script type="text/javascript">
+        function init_upload() {
+            var files = document.getElementById("file_input").files;
+            var file  = files[0];
+            if(file == null) {
+                alert("No file selected.");
+                return;
+            }
+
+            get_signed_data(file);
+        }
+
+        function get_signed_data(file){
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/sign_s3?file_name="+file.name+"&file_type="+file.type);
+            xhr.onreadystatechange = function(){
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var signed_data = JSON.parse(xhr.responseText);
+                        upload_file(file, signed_data);
+                    } else {
+                        alert("Could not get signed URL.");
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function upload_file(file, signed_data) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", signed_data.post_url);
+
+            var formData = new FormData();            
+            for( var i=0; i < signed_data.data.length; i++ ) {
+                // the data list consists of dictionaries with one key
+                // the key is used as the name of the form field
+                for( var k in signed_data.data[i] ) {
+                    formData.append( k, signed_data.data[i][k]);
+                }                
+            }
+            // file must be after the other data in the form fields
+            formData.append("file", file);
+            
+            xhr.onload = function() {
+                if (Math.floor(xhr.status/100) == 2) {
+                    document.getElementById("preview").src = signed_data.result_url;            
+                    document.getElementById("avatar_url").value = signed_data.result_url;
+                }
+            };
+            xhr.onerror = function() {
+                alert("Could not upload file."); 
+            };
+            xhr.send(formData);
+        }
+    </script>
+</body>
+</html>
